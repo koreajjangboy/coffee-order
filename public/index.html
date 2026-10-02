@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>☕ 모바일 커피 주문</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #f4f6f8;
+      padding: 20px;
+      color: #333;
+    }
+    .container {
+      max-width: 450px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 24px;
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    h1 {
+      font-size: 22px;
+      margin-bottom: 20px;
+      text-align: center;
+      color: #1a1a1a;
+    }
+    .form-group {
+      margin-bottom: 18px;
+    }
+    label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #4a5568;
+    }
+    input[type="text"], select {
+      width: 100%;
+      padding: 14px;
+      font-size: 16px;
+      border: 1px solid #cbd5e0;
+      border-radius: 8px;
+      background-color: #fff;
+      appearance: none;
+      outline: none;
+    }
+    input[type="text"]:focus, select:focus {
+      border-color: #3182ce;
+      box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.2);
+    }
+    button {
+      width: 100%;
+      padding: 16px;
+      font-size: 16px;
+      font-weight: bold;
+      color: #ffffff;
+      background-color: #3182ce;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    button:disabled {
+      background-color: #a0aec0;
+      cursor: not-allowed;
+    }
+    /* 주문 결과 카드 스타일 */
+    .result-card {
+      display: none;
+      margin-top: 20px;
+      padding: 20px;
+      background-color: #f0fff4;
+      border: 1px solid #68d391;
+      border-radius: 12px;
+    }
+    .result-card h2 {
+      color: #276749;
+      font-size: 18px;
+      margin-bottom: 12px;
+    }
+    .result-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+    .result-item span.label {
+      color: #718096;
+    }
+    .result-item span.value {
+      font-weight: bold;
+      color: #2d3748;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      background-color: #c6f6d5;
+      color: #22543d;
+      font-size: 12px;
+      font-weight: bold;
+      border-radius: 4px;
+      margin-bottom: 12px;
+    }
+    /* 차단 화면 스타일 */
+    .blocked-screen {
+      display: none;
+      text-align: center;
+      padding: 50px 10px;
+      color: #e53e3e;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- PC / 개발자 도구 차단 화면 -->
+  <div id="blockedScreen" class="blocked-screen">
+    <h2>🚫 접속이 차단되었습니다</h2>
+    <p style="margin-top: 10px; color: #4a5568;">실제 스마트폰 모바일 기기에서만 접근할 수 있습니다.</p>
+    <p style="font-size: 13px; color: #a0aec0; margin-top: 6px;">(PC 브라우저 또는 에뮬레이터 모드가 감지되었습니다)</p>
+  </div>
+
+  <!-- 메인 모바일 주문 화면 -->
+  <div id="mainContent" class="container">
+    <h1>☕ 모바일 커피 주문</h1>
+
+    <form id="orderForm">
+      <div class="form-group">
+        <label for="name">주문자 이름 *</label>
+        <input type="text" id="name" placeholder="이름을 입력하세요 (예: 홍길동)" required autocomplete="off">
+      </div>
+
+      <div class="form-group">
+        <label for="menuSelect">커피 메뉴 선택 *</label>
+        <select id="menuSelect" required>
+          <option value="">메뉴를 불러오는 중...</option>
+        </select>
+      </div>
+
+      <button type="submit" id="submitBtn">Slack으로 주문 보내기</button>
+    </form>
+
+    <!-- 주문 완료 결과 화면 -->
+    <div id="resultCard" class="result-card">
+      <h2>🎉 주문 성공!</h2>
+      <span class="status-badge">Slack 전송 완료</span>
+      <div class="result-item">
+        <span class="label">주문자 이름</span>
+        <span class="value" id="resName">-</span>
+      </div>
+      <div class="result-item">
+        <span class="label">선택한 메뉴 코드</span>
+        <span class="value" id="resCode">-</span>
+      </div>
+      <div class="result-item">
+        <span class="label">선택한 메뉴명</span>
+        <span class="value" id="resMenu">-</span>
+      </div>
+      <div class="result-item">
+        <span class="label">주문 시간</span>
+        <span class="value" id="resTime">-</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // -------------------------------------------------------------
+    // [Phase 2] 실제 스마트폰 모바일 기기 검증 함수
+    // -------------------------------------------------------------
+    function isRealMobileDevice() {
+      const hasTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+      const isCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
+      const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+      return isMobileUA && hasTouch && isCoarsePointer;
+    }
+
+    // -------------------------------------------------------------
+    // [Phase 3/4] Slack 공지 메뉴 불러오기 API 연동
+    // -------------------------------------------------------------
+    async function fetchMenu() {
+      const selectEl = document.getElementById('menuSelect');
+      try {
+        const response = await fetch('/api/menu');
+        const data = await response.json();
+
+        if (data.success && data.menus) {
+          selectEl.innerHTML = '<option value="">-- 메뉴를 선택하세요 --</option>';
+          data.menus.forEach(menu => {
+            const opt = document.createElement('option');
+            opt.value = menu.code;
+            opt.textContent = `[${menu.code}] ${menu.name}`;
+            selectEl.appendChild(opt);
+          });
+        }
+      } catch (err) {
+        selectEl.innerHTML = '<option value="">메뉴 불러오기 실패 (서버 확인 필요)</option>';
+      }
+    }
+
+    // -------------------------------------------------------------
+    // [Phase 4] 주문 제출 및 중복 클릭 방지 처리
+    // -------------------------------------------------------------
+    const orderForm = document.getElementById('orderForm');
+    const submitBtn = document.getElementById('submitBtn');
+
+    orderForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const name = document.getElementById('name').value.trim();
+      const menuCode = document.getElementById('menuSelect').value;
+
+      if (!name) {
+        alert('주문자 이름을 입력해주세요.');
+        return;
+      }
+      if (!menuCode) {
+        alert('메뉴를 선택해주세요.');
+        return;
+      }
+
+      // 🔒 [중복 클릭 방지] 버튼 비활성화
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Slack 전송 중...';
+
+      try {
+        const response = await fetch('/api/order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, menuCode })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || '주문 전송 중 오류가 발생했습니다.');
+        }
+
+        // 성공 결과 화면 채우기 및 출력
+        document.getElementById('resName').textContent = result.data.name;
+        document.getElementById('resCode').textContent = result.data.menuCode;
+        document.getElementById('resMenu').textContent = result.data.menuName;
+        document.getElementById('resTime').textContent = result.data.time;
+
+        orderForm.style.display = 'none';
+        document.getElementById('resultCard').style.display = 'block';
+
+      } catch (error) {
+        alert('오류 발생: ' + error.message);
+        // 실패 시 다시 주문할 수 있도록 버튼 복구
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Slack으로 주문 보내기';
+      }
+    });
+
+    // 페이지 로드 초기화
+    window.addEventListener('DOMContentLoaded', () => {
+      // 1. 실제 스마트폰 접속 여부 검증
+      if (!isRealMobileDevice()) {
+        document.getElementById('mainContent').style.display = 'none';
+        document.getElementById('blockedScreen').style.display = 'block';
+        return;
+      }
+
+      // 2. 메뉴 데이터 로드
+      fetchMenu();
+    });
+  </script>
+</body>
+</html>
